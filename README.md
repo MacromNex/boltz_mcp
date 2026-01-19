@@ -49,6 +49,17 @@ The Boltz MCP provides powerful protein structure prediction and protein-ligand 
 
 ## Installation
 
+### Quick Setup (Recommended)
+
+Run the automated setup script:
+
+```bash
+cd boltz_mcp
+bash quick_setup.sh
+```
+
+The script will create the conda environment, clone the Boltz2 repository, install all dependencies, and display the Claude Code configuration. See `quick_setup.sh --help` for options like `--skip-env` or `--skip-repo`.
+
 ### Prerequisites
 - Conda or Mamba (mamba recommended for faster installation)
 - Python 3.10+
@@ -56,7 +67,9 @@ The Boltz MCP provides powerful protein structure prediction and protein-ligand 
 - 16+ GB RAM for large proteins
 - ~10 GB storage for models and temporary data
 
-Please strictly follow the information in `reports/step3_environment.md` to obtain the procedure to setup the environment. An example workflow is shown below.
+### Manual Installation (Alternative)
+
+If you prefer manual installation or need to customize the setup, follow `reports/step3_environment.md`:
 
 ```bash
 # Navigate to the MCP directory
