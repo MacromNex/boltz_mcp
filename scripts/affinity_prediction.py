@@ -33,6 +33,7 @@ DEFAULT_CONFIG = {
     "use_msa_server": True,
     "use_potentials": False,
     "output_format": "pdb",
+    "accelerator": "gpu",
     "temp_prefix": "temp_affinity",
     "protein_id": "A",
     "ligand_id": "B"
@@ -95,7 +96,8 @@ def create_affinity_yaml(protein_sequence: str, ligand_smiles: str, output_path:
 
 def run_boltz_affinity_command(input_yaml: Union[str, Path], output_dir: Union[str, Path],
                                use_msa_server: bool = True, use_potentials: bool = False,
-                               output_format: str = "pdb") -> Dict[str, Any]:
+                               output_format: str = "pdb",
+                               accelerator: str = "gpu") -> Dict[str, Any]:
     """Run Boltz affinity prediction command.
 
     Args:
@@ -104,6 +106,7 @@ def run_boltz_affinity_command(input_yaml: Union[str, Path], output_dir: Union[s
         use_msa_server: Use MSA server for better accuracy
         use_potentials: Use inference-time potentials for better physics
         output_format: Output format (pdb, cif)
+        accelerator: Accelerator backend (gpu, cpu, tpu)
 
     Returns:
         Dict with success status and output information
@@ -111,7 +114,8 @@ def run_boltz_affinity_command(input_yaml: Union[str, Path], output_dir: Union[s
     cmd = [
         "boltz", "predict", str(input_yaml),
         "--out_dir", str(output_dir),
-        "--output_format", output_format
+        "--output_format", output_format,
+        "--accelerator", accelerator
     ]
 
     if use_msa_server:
@@ -120,8 +124,11 @@ def run_boltz_affinity_command(input_yaml: Union[str, Path], output_dir: Union[s
     if use_potentials:
         cmd.append("--use_potentials")
 
+    # Isolate from user site-packages to avoid version conflicts
+    env = {**os.environ, "PYTHONNOUSERSITE": "1"}
+
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, env=env)
         return {
             "success": True,
             "stdout": result.stdout,
@@ -311,7 +318,8 @@ def run_affinity_prediction(
         output_dir,
         use_msa_server=config['use_msa_server'],
         use_potentials=config['use_potentials'],
-        output_format=config['output_format']
+        output_format=config['output_format'],
+        accelerator=config['accelerator']
     )
 
     # Parse results
@@ -384,6 +392,8 @@ def main():
                        help='Use inference-time potentials for better physics')
     parser.add_argument('--output-format', choices=['pdb', 'cif'], default='pdb',
                        help='Output format (default: pdb)')
+    parser.add_argument('--accelerator', choices=['gpu', 'cpu', 'tpu'], default='gpu',
+                       help='Accelerator backend (default: gpu). Use cpu if no GPU available.')
 
     args = parser.parse_args()
 
@@ -401,7 +411,8 @@ def main():
     cli_overrides = {
         'use_msa_server': not args.no_msa_server,
         'use_potentials': args.use_potentials,
-        'output_format': args.output_format
+        'output_format': args.output_format,
+        'accelerator': args.accelerator
     }
 
     try:

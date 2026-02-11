@@ -126,10 +126,10 @@ if [ "$SKIP_ENV" = true ]; then
     info "Skipping dependency installation (--skip-env)"
 else
     info "Installing Boltz in editable mode..."
-    cd "$REPO_DIR/boltz" && "${ENV_DIR}/bin/pip" install -e . && cd "$SCRIPT_DIR"
+    "${ENV_DIR}/bin/pip" install --ignore-installed  "boltz[cuda]" -U
 
     info "Installing MCP dependencies..."
-    "${ENV_DIR}/bin/pip" install --ignore-installed fastmcp loguru
+    "${ENV_DIR}/bin/pip" install --ignore-installed fastmcp loguru tqdm
     success "Dependencies installed"
 fi
 
@@ -137,7 +137,7 @@ fi
 echo ""
 echo -e "${BLUE}Step 4: Verifying installation${NC}"
 
-"${ENV_DIR}/bin/python" -c "import fastmcp; import loguru; print('Core packages OK')" && success "Core packages verified" || error "Package verification failed"
+"${ENV_DIR}/bin/python" -c "import fastmcp; import loguru; import tqdm; print('Core packages OK')" && success "Core packages verified" || error "Package verification failed"
 
 # Print summary
 echo ""

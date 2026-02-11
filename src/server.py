@@ -101,7 +101,8 @@ def simple_structure_prediction(
     sequence: Optional[str] = None,
     output_dir: Optional[str] = None,
     use_msa_server: bool = True,
-    output_format: str = "pdb"
+    output_format: str = "pdb",
+    accelerator: str = "gpu"
 ) -> dict:
     """
     Generate protein structure predictions using Boltz (fast mode).
@@ -114,6 +115,7 @@ def simple_structure_prediction(
         output_dir: Directory to save output files (default: ./boltz_structure_output)
         use_msa_server: Use MSA server for better accuracy (default: True)
         output_format: Output format - pdb or cif (default: pdb)
+        accelerator: Accelerator backend - gpu, cpu, or tpu (default: gpu)
 
     Returns:
         Dictionary with generated structures and metadata
@@ -126,7 +128,8 @@ def simple_structure_prediction(
             sequence=sequence,
             output_dir=output_dir,
             use_msa_server=use_msa_server,
-            output_format=output_format
+            output_format=output_format,
+            accelerator=accelerator
         )
         return {"status": "success", **result}
     except FileNotFoundError as e:
@@ -145,7 +148,8 @@ def simple_affinity_prediction(
     ligand_ccd: Optional[str] = None,
     output_dir: Optional[str] = None,
     use_msa_server: bool = True,
-    output_format: str = "pdb"
+    output_format: str = "pdb",
+    accelerator: str = "gpu"
 ) -> dict:
     """
     Predict protein-ligand binding affinity and structure using Boltz (fast mode).
@@ -160,6 +164,7 @@ def simple_affinity_prediction(
         output_dir: Directory to save output files (default: ./boltz_affinity_output)
         use_msa_server: Use MSA server for better accuracy (default: True)
         output_format: Output format - pdb or cif (default: pdb)
+        accelerator: Accelerator backend - gpu, cpu, or tpu (default: gpu)
 
     Returns:
         Dictionary with affinity predictions and metadata
@@ -174,7 +179,8 @@ def simple_affinity_prediction(
             ligand_ccd=ligand_ccd,
             output_dir=output_dir,
             use_msa_server=use_msa_server,
-            output_format=output_format
+            output_format=output_format,
+            accelerator=accelerator
         )
         return {"status": "success", **result}
     except FileNotFoundError as e:
@@ -197,6 +203,7 @@ def submit_structure_prediction(
     use_msa_server: bool = True,
     use_potentials: bool = False,
     output_format: str = "pdb",
+    accelerator: str = "gpu",
     job_name: Optional[str] = None
 ) -> dict:
     """
@@ -211,6 +218,7 @@ def submit_structure_prediction(
         use_msa_server: Use MSA server for better accuracy (default: True)
         use_potentials: Use inference-time potentials for better physics (default: False)
         output_format: Output format - pdb or cif (default: pdb)
+        accelerator: Accelerator backend - gpu, cpu, or tpu (default: gpu)
         job_name: Optional name for tracking
 
     Returns:
@@ -223,7 +231,8 @@ def submit_structure_prediction(
 
     # Prepare arguments
     args = {
-        "output_format": output_format
+        "output_format": output_format,
+        "accelerator": accelerator
     }
 
     # Add input source
@@ -260,6 +269,7 @@ def submit_affinity_prediction(
     use_msa_server: bool = True,
     use_potentials: bool = False,
     output_format: str = "pdb",
+    accelerator: str = "gpu",
     job_name: Optional[str] = None
 ) -> dict:
     """
@@ -276,6 +286,7 @@ def submit_affinity_prediction(
         use_msa_server: Use MSA server for better accuracy (default: True)
         use_potentials: Use inference-time potentials for better physics (default: False)
         output_format: Output format - pdb or cif (default: pdb)
+        accelerator: Accelerator backend - gpu, cpu, or tpu (default: gpu)
         job_name: Optional name for tracking
 
     Returns:
@@ -285,7 +296,8 @@ def submit_affinity_prediction(
 
     # Prepare arguments
     args = {
-        "output_format": output_format
+        "output_format": output_format,
+        "accelerator": accelerator
     }
 
     # Add input source
@@ -323,6 +335,7 @@ def submit_batch_structure_prediction(
     use_msa_server: bool = True,
     use_potentials: bool = False,
     output_format: str = "pdb",
+    accelerator: str = "gpu",
     job_name: Optional[str] = None
 ) -> dict:
     """
@@ -336,6 +349,7 @@ def submit_batch_structure_prediction(
         use_msa_server: Use MSA server for better accuracy (default: True)
         use_potentials: Use inference-time potentials for better physics (default: False)
         output_format: Output format - pdb or cif (default: pdb)
+        accelerator: Accelerator backend - gpu, cpu, or tpu (default: gpu)
         job_name: Optional name for tracking
 
     Returns:
@@ -356,7 +370,8 @@ def submit_batch_structure_prediction(
 
     args = {
         "batch-sequences-file": temp_sequences_file,
-        "output_format": output_format
+        "output_format": output_format,
+        "accelerator": accelerator
     }
 
     if output_dir:

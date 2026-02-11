@@ -8,7 +8,6 @@
 - [Local Usage (Scripts)](#local-usage-scripts)
 - [MCP Server Installation](#mcp-server-installation)
 - [Using with Claude Code](#using-with-claude-code)
-- [Using with Gemini CLI](#using-with-gemini-cli)
 - [Available Tools](#available-tools)
 - [Examples](#examples)
 - [Troubleshooting](#troubleshooting)
@@ -25,25 +24,6 @@ The Boltz MCP provides powerful protein structure prediction and protein-ligand 
 - **MSA Integration**: Automatic Multiple Sequence Alignment generation for improved accuracy
 - **Inference-Time Potentials**: Enhanced physics-based refinement for higher quality structures
 - **CUDA Acceleration**: GPU support for faster processing on NVIDIA hardware
-
-### Directory Structure
-```
-./
-├── README.md               # This file
-├── env/                    # Conda environment
-├── src/
-│   ├── server.py           # MCP server
-│   └── jobs/               # Job management system
-├── scripts/
-│   ├── structure_prediction.py    # Protein structure prediction
-│   ├── affinity_prediction.py     # Protein-ligand affinity prediction
-│   └── lib/                # Shared utilities
-├── examples/
-│   └── data/               # Demo data
-├── configs/                # Configuration files (empty)
-├── reports/                # Step documentation
-└── repo/                   # Original Boltz2 repository
-```
 
 ---
 
