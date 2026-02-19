@@ -8,6 +8,7 @@ Boltz MCP is an MCP (Model Context Protocol) server wrapping the [Boltz2](https:
 
 ## Setup
 
+### Local (conda)
 ```bash
 bash quick_setup.sh          # creates conda env at ./env, clones Boltz2 into repo/boltz, installs deps
 # Options: --skip-env, --skip-repo
@@ -17,6 +18,14 @@ Register with Claude Code:
 ```bash
 claude mcp add boltz -- $(pwd)/env/bin/python $(pwd)/src/server.py
 ```
+
+### Docker
+```bash
+docker pull ghcr.io/macromnex/boltz_mcp:latest
+docker run --gpus all ghcr.io/macromnex/boltz_mcp:latest
+```
+
+The Docker image includes pre-cached Boltz2 checkpoints (~6 GB) at `/root/.boltz` so no download is needed at runtime. Image is built and pushed to GHCR automatically via `.github/workflows/docker.yml` on pushes to `main` or version tags.
 
 ## Running
 
@@ -38,12 +47,13 @@ Tests are custom scripts (no pytest framework). Run from the project root with t
 ```bash
 ./env/bin/python tests/test_server.py          # unit tests: imports, job manager, validation tools
 ./env/bin/python tests/test_integration.py     # full integration: all MCP tools with real/mock data
+./env/bin/python tests/test_simple.py          # quick validation of all tool types
 ```
 
 ## Architecture
 
 ```
-src/server.py          — FastMCP server; all MCP tool definitions (@mcp.tool decorators)
+src/server.py          — FastMCP server; all 13 MCP tool definitions (@mcp.tool decorators)
 src/jobs/manager.py    — JobManager: async job execution via subprocess + threading
 scripts/               — Standalone CLI scripts that server.py delegates to
   structure_prediction.py  — boltz predict wrapper for protein structure
@@ -52,6 +62,20 @@ examples/data/         — YAML input configs and FASTA files for testing
 jobs/                  — Runtime directory for async job metadata, logs, and outputs
 repo/boltz/            — Cloned Boltz2 repository (installed in editable mode)
 ```
+
+### MCP Tools (13 total)
+
+| Category | Tool | Purpose |
+|----------|------|---------|
+| Sync | `simple_structure_prediction` | Block & return structure prediction results |
+| Sync | `simple_affinity_prediction` | Block & return affinity prediction results |
+| Async | `submit_structure_prediction` | Background structure prediction, returns `job_id` |
+| Async | `submit_affinity_prediction` | Background affinity prediction, returns `job_id` |
+| Async | `submit_batch_structure_prediction` | Batch multiple sequences as one job |
+| Jobs | `get_job_status`, `get_job_result`, `get_job_log`, `cancel_job`, `list_jobs` | Async job lifecycle management |
+| Utility | `validate_protein_sequence` | Validate amino acid sequence + composition |
+| Utility | `validate_ligand_smiles` | Validate SMILES + molecular properties (via RDKit) |
+| Utility | `list_example_data` | List bundled example YAML/FASTA files |
 
 ### Key Design Patterns
 
@@ -69,9 +93,18 @@ repo/boltz/            — Cloned Boltz2 repository (installed in editable mode)
 2. If it needs a CLI script, add to `scripts/` with the pattern: `run_*()` function + `argparse` CLI
 3. For async support, use `job_manager.submit_job(script_path, args)` which builds `mamba run` commands
 
+## Docker Notes
+
+- **Dockerfile**: Multi-stage build (`python:3.10-slim`). Builder stage installs `boltz[cuda]` via pip and downloads all Boltz2 checkpoints from HuggingFace. Runtime stage copies installed packages and cached models.
+- **Pre-cached models** at `/root/.boltz`: `boltz2_conf.ckpt` (2.2 GB), `boltz2_aff.ckpt` (2.0 GB), `mols/` + `mols.tar` (1.8 GB)
+- **Environment variable**: `BOLTZ_CACHE=/root/.boltz` tells Boltz where to find cached models
+- **`.dockerignore`**: Uses `/jobs/` (with leading slash) to exclude the top-level runtime directory without excluding `src/jobs/`
+- **Image size**: ~15 GB (PyTorch + CUDA libs + model checkpoints)
+- **CI/CD**: `.github/workflows/docker.yml` builds and pushes to `ghcr.io` with `latest`, `sha-*`, and semver tags
+
 ## Environment Notes
 
 - Conda env at `./env` with Python 3.10; Boltz2 installed in editable mode from `repo/boltz`
 - Key deps: `boltz`, `fastmcp`, `loguru`, `torch`, `rdkit` (for SMILES validation)
 - GPU (NVIDIA 8+ GB VRAM) strongly recommended; CPU fallback via `CUDA_VISIBLE_DEVICES=""`
-- Models auto-download on first use (~2-4 GB)
+- Models auto-download on first use (~2-4 GB) to `~/.boltz` (or `$BOLTZ_CACHE`)
