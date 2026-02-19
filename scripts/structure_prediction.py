@@ -90,8 +90,11 @@ def run_boltz_command(input_yaml: Union[str, Path], output_dir: Union[str, Path]
     Returns:
         Dict with success status and output information
     """
+    # Use Python interpreter to call boltz CLI directly
     cmd = [
-        "boltz", "predict", str(input_yaml),
+        sys.executable, "-c",
+        "from boltz.main import cli; cli()",
+        "predict", str(input_yaml),
         "--out_dir", str(output_dir),
         "--output_format", output_format,
         "--accelerator", accelerator

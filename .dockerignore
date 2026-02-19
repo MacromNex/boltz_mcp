@@ -1,0 +1,12 @@
+env/
+repo/
+jobs/
+tmp/
+reports/
+tests/
+__pycache__/
+*.pyc
+.git/
+.github/
+*.md
+!examples/README.md

@@ -111,8 +111,11 @@ def run_boltz_affinity_command(input_yaml: Union[str, Path], output_dir: Union[s
     Returns:
         Dict with success status and output information
     """
+    # Use Python interpreter to call boltz CLI directly
     cmd = [
-        "boltz", "predict", str(input_yaml),
+        sys.executable, "-c",
+        "from boltz.main import cli; cli()",
+        "predict", str(input_yaml),
         "--out_dir", str(output_dir),
         "--output_format", output_format,
         "--accelerator", accelerator
