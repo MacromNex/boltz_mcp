@@ -30,8 +30,11 @@ COPY --from=builder /install /usr/local
 COPY --from=builder /root/.boltz /root/.boltz
 
 COPY src/ ./src/
+RUN chmod -R a+r /app/src/
 COPY scripts/ ./scripts/
+RUN chmod -R a+r /app/scripts/
 COPY examples/ ./examples/
+RUN chmod -R a+r /app/examples/
 RUN mkdir -p jobs tmp/inputs tmp/outputs
 
 ENV PYTHONPATH=/app
