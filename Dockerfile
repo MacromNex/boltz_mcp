@@ -35,7 +35,11 @@ COPY scripts/ ./scripts/
 RUN chmod -R a+r /app/scripts/
 COPY examples/ ./examples/
 RUN chmod -R a+r /app/examples/
-RUN mkdir -p jobs tmp/inputs tmp/outputs
+RUN mkdir -p jobs tmp/inputs tmp/outputs results && \
+    chmod 777 /app /app/jobs /app/tmp /app/tmp/inputs /app/tmp/outputs
+
+# Make boltz cache accessible to any user
+RUN chmod -R 777 /root /root/.boltz
 
 ENV PYTHONPATH=/app
 ENV BOLTZ_CACHE=/root/.boltz
