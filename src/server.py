@@ -99,7 +99,9 @@ def list_jobs(status: Optional[str] = None) -> dict:
 def simple_structure_prediction(
     input_file: Optional[str] = None,
     sequence: Optional[str] = None,
+    ligand_smiles: Optional[str] = None,
     output_dir: Optional[str] = None,
+    msa_path: Optional[str] = None,
     use_msa_server: bool = True,
     output_format: str = "pdb",
     accelerator: str = "gpu"
@@ -108,12 +110,15 @@ def simple_structure_prediction(
     Generate protein structure predictions using Boltz (fast mode).
 
     Fast operation that completes in ~5-10 minutes. Use this for single structure prediction.
+    Supports protein-only or protein-ligand complex prediction.
 
     Args:
         input_file: Path to input YAML file (mutually exclusive with sequence)
         sequence: Protein amino acid sequence (mutually exclusive with input_file)
+        ligand_smiles: Ligand SMILES string for complex prediction (use with sequence, not input_file)
         output_dir: Directory to save output files (default: ./boltz_structure_output)
-        use_msa_server: Use MSA server for better accuracy (default: True)
+        msa_path: Path to pre-computed .a3m MSA file (skips slow MSA server query)
+        use_msa_server: Use MSA server for better accuracy (default: True, ignored if msa_path is set)
         output_format: Output format - pdb or cif (default: pdb)
         accelerator: Accelerator backend - gpu, cpu, or tpu (default: gpu)
 
@@ -126,7 +131,9 @@ def simple_structure_prediction(
         result = run_structure_prediction(
             input_file=input_file,
             sequence=sequence,
+            ligand_smiles=ligand_smiles,
             output_dir=output_dir,
+            msa_path=msa_path,
             use_msa_server=use_msa_server,
             output_format=output_format,
             accelerator=accelerator
@@ -147,6 +154,7 @@ def simple_affinity_prediction(
     ligand_smiles: Optional[str] = None,
     ligand_ccd: Optional[str] = None,
     output_dir: Optional[str] = None,
+    msa_path: Optional[str] = None,
     use_msa_server: bool = True,
     output_format: str = "pdb",
     accelerator: str = "gpu"
@@ -154,7 +162,8 @@ def simple_affinity_prediction(
     """
     Predict protein-ligand binding affinity and structure using Boltz (fast mode).
 
-    Fast operation that completes in ~8-15 minutes. Use this for simple affinity prediction.
+    Fast operation that completes in ~2-5 minutes with pre-computed MSA, ~8-15 minutes without.
+    For screening multiple ligands against the same protein, compute MSA once and reuse via msa_path.
 
     Args:
         input_file: Path to input YAML file (mutually exclusive with sequence/ligand params)
@@ -162,7 +171,8 @@ def simple_affinity_prediction(
         ligand_smiles: Ligand SMILES string
         ligand_ccd: Ligand CCD code (alternative to SMILES)
         output_dir: Directory to save output files (default: ./boltz_affinity_output)
-        use_msa_server: Use MSA server for better accuracy (default: True)
+        msa_path: Path to pre-computed .a3m MSA file (skips slow MSA server query)
+        use_msa_server: Use MSA server for better accuracy (default: True, ignored if msa_path is set)
         output_format: Output format - pdb or cif (default: pdb)
         accelerator: Accelerator backend - gpu, cpu, or tpu (default: gpu)
 
@@ -178,6 +188,7 @@ def simple_affinity_prediction(
             ligand_smiles=ligand_smiles,
             ligand_ccd=ligand_ccd,
             output_dir=output_dir,
+            msa_path=msa_path,
             use_msa_server=use_msa_server,
             output_format=output_format,
             accelerator=accelerator
@@ -199,7 +210,9 @@ def simple_affinity_prediction(
 def submit_structure_prediction(
     input_file: Optional[str] = None,
     sequence: Optional[str] = None,
+    ligand_smiles: Optional[str] = None,
     output_dir: Optional[str] = None,
+    msa_path: Optional[str] = None,
     use_msa_server: bool = True,
     use_potentials: bool = False,
     output_format: str = "pdb",
@@ -210,12 +223,15 @@ def submit_structure_prediction(
     Submit protein structure prediction for background processing.
 
     This operation may take >10 minutes for complex sequences. Returns a job_id for tracking.
+    Supports protein-only or protein-ligand complex prediction.
 
     Args:
         input_file: Path to input YAML file (mutually exclusive with sequence)
         sequence: Protein amino acid sequence (mutually exclusive with input_file)
+        ligand_smiles: Ligand SMILES string for complex prediction (use with sequence, not input_file)
         output_dir: Directory for outputs
-        use_msa_server: Use MSA server for better accuracy (default: True)
+        msa_path: Path to pre-computed .a3m MSA file (skips slow MSA server query)
+        use_msa_server: Use MSA server for better accuracy (default: True, ignored if msa_path is set)
         use_potentials: Use inference-time potentials for better physics (default: False)
         output_format: Output format - pdb or cif (default: pdb)
         accelerator: Accelerator backend - gpu, cpu, or tpu (default: gpu)
@@ -231,7 +247,7 @@ def submit_structure_prediction(
 
     # Prepare arguments
     args = {
-        "output_format": output_format,
+        "output-format": output_format,
         "accelerator": accelerator
     }
 
@@ -243,13 +259,23 @@ def submit_structure_prediction(
     else:
         return {"status": "error", "error": "Must provide either input_file or sequence"}
 
+    # Add ligand SMILES for complex prediction
+    if ligand_smiles:
+        if not sequence:
+            return {"status": "error", "error": "ligand_smiles requires sequence (not input_file)"}
+        args["ligand-smiles"] = ligand_smiles
+
     # Add output directory
     if output_dir:
         args["output"] = output_dir
 
-    # Add flags
-    if not use_msa_server:
+    # Add MSA path
+    if msa_path:
+        args["msa-path"] = msa_path
+    elif not use_msa_server:
         args["no-msa-server"] = True
+
+    # Add flags
     if use_potentials:
         args["use-potentials"] = True
 
@@ -266,6 +292,7 @@ def submit_affinity_prediction(
     ligand_smiles: Optional[str] = None,
     ligand_ccd: Optional[str] = None,
     output_dir: Optional[str] = None,
+    msa_path: Optional[str] = None,
     use_msa_server: bool = True,
     use_potentials: bool = False,
     output_format: str = "pdb",
@@ -276,6 +303,7 @@ def submit_affinity_prediction(
     Submit protein-ligand affinity prediction for background processing.
 
     This operation may take >10 minutes for complex systems. Returns a job_id for tracking.
+    For screening multiple ligands against the same protein, compute MSA once and reuse via msa_path.
 
     Args:
         input_file: Path to input YAML file (mutually exclusive with sequence/ligand params)
@@ -283,7 +311,8 @@ def submit_affinity_prediction(
         ligand_smiles: Ligand SMILES string
         ligand_ccd: Ligand CCD code (alternative to SMILES)
         output_dir: Directory for outputs
-        use_msa_server: Use MSA server for better accuracy (default: True)
+        msa_path: Path to pre-computed .a3m MSA file (skips slow MSA server query)
+        use_msa_server: Use MSA server for better accuracy (default: True, ignored if msa_path is set)
         use_potentials: Use inference-time potentials for better physics (default: False)
         output_format: Output format - pdb or cif (default: pdb)
         accelerator: Accelerator backend - gpu, cpu, or tpu (default: gpu)
@@ -296,7 +325,7 @@ def submit_affinity_prediction(
 
     # Prepare arguments
     args = {
-        "output_format": output_format,
+        "output-format": output_format,
         "accelerator": accelerator
     }
 
@@ -316,9 +345,13 @@ def submit_affinity_prediction(
     if output_dir:
         args["output"] = output_dir
 
-    # Add flags
-    if not use_msa_server:
+    # Add MSA path
+    if msa_path:
+        args["msa-path"] = msa_path
+    elif not use_msa_server:
         args["no-msa-server"] = True
+
+    # Add flags
     if use_potentials:
         args["use-potentials"] = True
 
@@ -332,6 +365,7 @@ def submit_affinity_prediction(
 def submit_batch_structure_prediction(
     sequences: List[str],
     output_dir: Optional[str] = None,
+    msa_path: Optional[str] = None,
     use_msa_server: bool = True,
     use_potentials: bool = False,
     output_format: str = "pdb",
@@ -346,7 +380,8 @@ def submit_batch_structure_prediction(
     Args:
         sequences: List of protein amino acid sequences to predict
         output_dir: Directory for outputs
-        use_msa_server: Use MSA server for better accuracy (default: True)
+        msa_path: Path to pre-computed .a3m MSA file (skips slow MSA server query)
+        use_msa_server: Use MSA server for better accuracy (default: True, ignored if msa_path is set)
         use_potentials: Use inference-time potentials for better physics (default: False)
         output_format: Output format - pdb or cif (default: pdb)
         accelerator: Accelerator backend - gpu, cpu, or tpu (default: gpu)
@@ -370,13 +405,15 @@ def submit_batch_structure_prediction(
 
     args = {
         "batch-sequences-file": temp_sequences_file,
-        "output_format": output_format,
+        "output-format": output_format,
         "accelerator": accelerator
     }
 
     if output_dir:
         args["output"] = output_dir
-    if not use_msa_server:
+    if msa_path:
+        args["msa-path"] = msa_path
+    elif not use_msa_server:
         args["no-msa-server"] = True
     if use_potentials:
         args["use-potentials"] = True

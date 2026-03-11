@@ -20,6 +20,15 @@ Example:
 import argparse
 import os
 import sys
+
+# Fix for running as non-existent UID in Docker containers
+if 'USER' not in os.environ:
+    os.environ['USER'] = 'user'
+# Fix numba and torch cache dirs for non-root Docker users
+os.environ.setdefault('NUMBA_CACHE_DIR', '/tmp/numba_cache')
+os.environ.setdefault('NUMBA_DISABLE_JIT', '0')
+os.environ.setdefault('MPLCONFIGDIR', '/tmp/matplotlib')
+os.environ.setdefault('TORCHINDUCTOR_CACHE_DIR', '/tmp/torch_cache')
 import json
 import yaml
 import subprocess
@@ -44,7 +53,7 @@ DEFAULT_CONFIG = {
 # ==============================================================================
 def create_affinity_yaml(protein_sequence: str, ligand_smiles: str, output_path: Union[str, Path],
                          ligand_ccd: Optional[str] = None, protein_id: str = "A",
-                         ligand_id: str = "B") -> Path:
+                         ligand_id: str = "B", msa_path: Optional[str] = None) -> Path:
     """Create a protein-ligand affinity prediction YAML configuration file.
 
     Args:
@@ -54,18 +63,23 @@ def create_affinity_yaml(protein_sequence: str, ligand_smiles: str, output_path:
         ligand_ccd: Optional CCD code instead of SMILES
         protein_id: Protein chain ID (default: A)
         ligand_id: Ligand ID (default: B)
+        msa_path: Optional path to pre-computed .a3m MSA file
 
     Returns:
         Path to created YAML file
     """
+    protein_entry = {
+        "id": protein_id,
+        "sequence": protein_sequence
+    }
+    if msa_path:
+        protein_entry["msa"] = str(msa_path)
+
     config = {
         "version": 1,
         "sequences": [
             {
-                "protein": {
-                    "id": protein_id,
-                    "sequence": protein_sequence
-                }
+                "protein": protein_entry
             },
             {
                 "ligand": {
@@ -236,6 +250,7 @@ def run_affinity_prediction(
     ligand_smiles: Optional[str] = None,
     ligand_ccd: Optional[str] = None,
     output_dir: Optional[Union[str, Path]] = None,
+    msa_path: Optional[str] = None,
     config: Optional[Dict[str, Any]] = None,
     **kwargs
 ) -> Dict[str, Any]:
@@ -311,15 +326,19 @@ def run_affinity_prediction(
             temp_yaml,
             ligand_ccd=ligand_ccd,
             protein_id=config['protein_id'],
-            ligand_id=config['ligand_id']
+            ligand_id=config['ligand_id'],
+            msa_path=msa_path
         )
         cleanup_temp = True
+
+    # When pre-computed MSA is provided, don't use the MSA server
+    use_msa = config['use_msa_server'] and not msa_path
 
     # Run prediction
     prediction_result = run_boltz_affinity_command(
         input_yaml_path,
         output_dir,
-        use_msa_server=config['use_msa_server'],
+        use_msa_server=use_msa,
         use_potentials=config['use_potentials'],
         output_format=config['output_format'],
         accelerator=config['accelerator']
@@ -383,6 +402,9 @@ def main():
     parser.add_argument('--ligand-smiles', help='Ligand SMILES string')
     parser.add_argument('--ligand-ccd', help='Ligand CCD code')
 
+    # MSA options
+    parser.add_argument('--msa-path', help='Path to pre-computed .a3m MSA file (skips MSA server)')
+
     # Output options
     parser.add_argument('--output', '-o', default="./boltz_affinity_output",
                        help='Output directory (default: ./boltz_affinity_output)')
@@ -426,6 +448,7 @@ def main():
             ligand_smiles=args.ligand_smiles,
             ligand_ccd=args.ligand_ccd,
             output_dir=args.output,
+            msa_path=args.msa_path,
             config=config,
             **cli_overrides
         )

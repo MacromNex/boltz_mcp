@@ -1,47 +1,53 @@
-FROM python:3.10-slim AS builder
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS builder
 
 RUN apt-get update && apt-get install -y \
+    python3.10 python3.10-dev python3.10-venv python3-pip \
     git gcc g++ wget \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python \
+    && python -m pip install --upgrade pip \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Install into a venv so we can copy it cleanly to runtime
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --no-cache-dir "boltz[cuda]" -U
+RUN pip install --no-cache-dir fastmcp loguru tqdm
 
-# Install boltz with CUDA support and MCP dependencies
-RUN pip install --no-cache-dir --prefix=/install "boltz[cuda]" -U
-RUN pip install --no-cache-dir --prefix=/install --ignore-installed fastmcp loguru tqdm
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS runtime
 
-# Download Boltz2 model checkpoints and CCD data into cache
-ENV BOLTZ_CACHE=/root/.boltz
-RUN mkdir -p ${BOLTZ_CACHE} \
-    && wget -q -O ${BOLTZ_CACHE}/mols.tar \
-       "https://huggingface.co/boltz-community/boltz-2/resolve/main/mols.tar" \
-    && tar xf ${BOLTZ_CACHE}/mols.tar -C ${BOLTZ_CACHE} \
-    && wget -q -O ${BOLTZ_CACHE}/boltz2_conf.ckpt \
-       "https://huggingface.co/boltz-community/boltz-2/resolve/main/boltz2_conf.ckpt" \
-    && wget -q -O ${BOLTZ_CACHE}/boltz2_aff.ckpt \
-       "https://huggingface.co/boltz-community/boltz-2/resolve/main/boltz2_aff.ckpt"
+RUN apt-get update && apt-get install -y \
+    python3.10 python3.10-dev python3.10-venv libgomp1 gcc \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python \
+    && rm -rf /var/lib/apt/lists/*
 
-FROM python:3.10-slim AS runtime
-
-RUN apt-get update && apt-get install -y libgomp1 && rm -rf /var/lib/apt/lists/*
+# Copy the venv with all dependencies
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /app
-COPY --from=builder /install /usr/local
-COPY --from=builder /root/.boltz /root/.boltz
-
 COPY src/ ./src/
-RUN chmod -R a+r /app/src/
 COPY scripts/ ./scripts/
-RUN chmod -R a+r /app/scripts/
 COPY examples/ ./examples/
-RUN chmod -R a+r /app/examples/
-RUN mkdir -p jobs tmp/inputs tmp/outputs results && \
-    chmod 777 /app /app/jobs /app/tmp /app/tmp/inputs /app/tmp/outputs
+RUN chmod -R a+rX /app/src /app/scripts /app/examples
 
-# Make boltz cache accessible to any user
-RUN chmod -R 777 /root /root/.boltz
+# Create runtime directories writable by any user (jobs, tmp for YAML configs, results)
+RUN mkdir -p /app/jobs /app/tmp/inputs /app/tmp/outputs /app/results \
+    && chmod a+rwx /app/jobs /app/tmp /app/tmp/inputs /app/tmp/outputs /app/results
 
+# Neutral mount points for Boltz checkpoints and pre-computed MSA
+# Mount host ~/.boltz to /opt/boltz_cache at runtime
+# Mount pre-computed MSA files to /opt/msa at runtime
+RUN mkdir -p /opt/boltz_cache /opt/msa && chmod a+rx /opt/boltz_cache /opt/msa
+
+# Use /tmp as HOME so Python/torch/numba can write caches when running as arbitrary UID
+ENV HOME=/tmp
 ENV PYTHONPATH=/app
-ENV BOLTZ_CACHE=/root/.boltz
+ENV BOLTZ_CACHE=/opt/boltz_cache
+ENV NUMBA_CACHE_DIR=/tmp/numba_cache
+ENV MPLCONFIGDIR=/tmp/matplotlib
+ENV TORCHINDUCTOR_CACHE_DIR=/tmp/torch_cache
+# Suppress NVIDIA banner and disable entrypoint check (banner pollutes MCP stdio)
+ENV NVIDIA_PRODUCT_NAME=""
+ENTRYPOINT []
 
 CMD ["python", "src/server.py"]
